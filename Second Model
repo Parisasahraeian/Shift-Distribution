@@ -1,0 +1,85 @@
+ '''
+Shift Distribution Model
+
+Advisor: Dr. Baski Balasundaram
+
+Parisa Sahraeian
+
+'''
+
+import gurobipy as gp
+from gurobipy import GRB
+import numpy as np
+import pandas as pd
+
+#Importing Data
+# file = "C:/Users/psahr/Desktop/Shift distribution Model Data.TXT"
+# datafile = "C:/Users/psahr/Desktop/demand_1.csv"
+
+file = "C:/Users/psahr/Desktop/Shift distribution Model Data.TXT"
+datafile = "C:/Users/psahr/Desktop/demand_1.csv"
+X=np.loadtxt(file, skiprows=2).astype(int)
+R = pd.read_csv(datafile,header=None)
+
+#Parameters:
+#Numbre of shift types
+shift_types = X[0,0]
+#d = duration of shift by type
+d = X[1,:]
+print(d)
+#Getting Time limit in seconds
+tl= X[3,0]
+#number of time slots 
+T = X[2,0]
+#Requirements of every time slot
+r = np.array(R)
+l = range(shift_types)
+#Defining the model
+modell = gp.Model("Shift Distribution Model")
+a=0
+
+# Decision variable: x[i,l] denote the number of shifts of type l(=1,2,3) that must start in time-slot i.
+nshifts = modell.addVars(l,range(1,T+1),vtype=GRB.INTEGER, obj=1, name="Number of shifts of type "+str(l))
+    
+# We want to minimize the total costs
+modell.modelSense = GRB.MINIMIZE
+
+#adding costraints
+ for k in range(1,T+1):
+        if k>= 1 and k<=d[0]:
+                modell.addConstr(sum(nshifts[a,k-i] for i in range(k) for a in range(shift_types)) >= r[k][0] )
+        
+        elif k>d[0] and k <= d[1]:
+                modell.addConstr(sum(nshifts[0,k-i] for i in range(d[0])) + 
+                                 sum(nshifts[a,k-i] for i in range(k) for a in range(1,shift_types)) >= r[k][0])
+       
+        elif k>d[1] and k <= d[2]:
+             modell.addConstr(sum(nshifts[a,k-i] for i in range(d[a]) for a in range(0,2))+
+                              sum(nshifts[2,k-i] for i in range(k)) >= r[k][0])
+       
+        elif k>d[2] and k <= (T-d[2]+1):
+                modell.addConstr(sum(nshifts[a,k-i] for i in range(d[a]) for a in range(shift_types)) >= r[k][0]) 
+       
+        elif k>(T-d[2]+1) and k <= (T-d[1]+1):
+                 modell.addConstr(sum(nshifts[a,k-i] for i in range(d[a]) for a in range(0,2))+
+                                  sum(nshifts[2,k-i] for i in range(k-(T-d[2]+1),d[2]))>=r[k][0])
+        
+        elif k>(T - d[1] +1) and k <= (T-d[0]+1):
+                 modell.addConstr(sum(nshifts[0,k-i] for i in range(d[0]))+
+                                  sum(nshifts[a,k-i] for i in range(k-(T-d[a]+1),d[a]) for a in range(1,shift_types))>= r[k][0])
+        
+        elif k > (T-d[0]+1) and k <= T:
+                modell.addConstr(sum(nshifts[a,k-i] for i in range(k-(T-d[a]+1),d[a]) for a in range(shift_types))>=r[k-1][0])   
+        
+
+#Time limit
+modell.params.timelimit= tl
+
+# Solve
+modell.optimize()
+
+
+
+
+
+
